@@ -1198,35 +1198,38 @@ open class Manager : ArmchairManager {
                 closure()
             }
         } else {
-            #if os(iOS)
-                if (operatingSystemVersion >= 8 && usesAlertController) || operatingSystemVersion >= 9 {
-                    /* iOS 8 uses new UIAlertController API*/
-                    let alertView : UIAlertController = UIAlertController(title: reviewTitle, message: reviewMessage, preferredStyle: UIAlertControllerStyle.alert)
-                    alertView.addAction(UIAlertAction(title: cancelButtonTitle, style:UIAlertActionStyle.cancel, handler: {
-                        (alert: UIAlertAction!) in
-                        self.dontRate()
-                    }))
-                    if (showsRemindButton()) {
-                        alertView.addAction(UIAlertAction(title: remindButtonTitle!, style:UIAlertActionStyle.default, handler: {
+            if #available(iOS 9.0, *) {
+                #if os(iOS)
+                    if (operatingSystemVersion >= 8 && usesAlertController) || operatingSystemVersion >= 9 {
+                        /* iOS 8 uses new UIAlertController API*/
+                        let alertView : UIAlertController = UIAlertController(title: reviewTitle, message: reviewMessage, preferredStyle: UIAlertControllerStyle.alert)
+                        let prefferedAction = UIAlertAction(title: rateButtonTitle, style:UIAlertActionStyle.default, handler: {
                             (alert: UIAlertAction!) in
-                            self.remindMeLater()
-                        }))
-                    }
-                    alertView.addAction(UIAlertAction(title: rateButtonTitle, style:UIAlertActionStyle.default, handler: {
-                        (alert: UIAlertAction!) in
-                        self._rateApp()
-                    }))
-                    
-                    // get the top most controller (= the StoreKit Controller) and dismiss it
-                    if let presentingController = UIApplication.shared.keyWindow?.rootViewController {
-                        if let topController = topMostViewController(presentingController) {
-                            topController.present(alertView, animated: usesAnimation) {
-                                print("presentViewController() completed")
-                            }
+                            self._rateApp()
+                        })
+                        alertView.addAction(prefferedAction)
+                        if (showsRemindButton()) {
+                            alertView.addAction(UIAlertAction(title: remindButtonTitle!, style:UIAlertActionStyle.cancel, handler: {
+                                (alert: UIAlertAction!) in
+                                self.remindMeLater()
+                            }))
                         }
-                        // note that tint color has to be set after the controller is presented in order to take effect (last checked in iOS 9.3)
-                        alertView.view.tintColor = tintColor
-                    }
+                        alertView.addAction(UIAlertAction(title: cancelButtonTitle, style:UIAlertActionStyle.default, handler: {
+                            (alert: UIAlertAction!) in
+                            self.dontRate()
+                        }))
+                        alertView.preferredAction = prefferedAction
+                        
+                        // get the top most controller (= the StoreKit Controller) and dismiss it
+                        if let presentingController = UIApplication.shared.keyWindow?.rootViewController {
+                            if let topController = topMostViewController(presentingController) {
+                                topController.present(alertView, animated: usesAnimation) {
+                                    print("presentViewController() completed")
+                                }
+                            }
+                            // note that tint color has to be set after the controller is presented in order to take effect (last checked in iOS 9.3)
+                            alertView.view.tintColor = tintColor
+                        }
                     
                 } else {
                     /* Otherwise we use UIAlertView still */
