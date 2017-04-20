@@ -1200,7 +1200,7 @@ open class Manager : ArmchairManager {
         } else {
             if #available(iOS 9.0, *) {
                 #if os(iOS)
-                    if (operatingSystemVersion >= 8 && usesAlertController) || operatingSystemVersion >= 9 {
+                if (operatingSystemVersion >= 8 && usesAlertController) || operatingSystemVersion >= 9 {
                         /* iOS 8 uses new UIAlertController API*/
                         let alertView : UIAlertController = UIAlertController(title: reviewTitle, message: reviewMessage, preferredStyle: UIAlertControllerStyle.alert)
                         let prefferedAction = UIAlertAction(title: rateButtonTitle, style:UIAlertActionStyle.default, handler: {
@@ -1250,6 +1250,7 @@ open class Manager : ArmchairManager {
                         closure()
                     }
                 }
+            }
                 
             #elseif os(OSX)
                 
