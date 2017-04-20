@@ -356,8 +356,6 @@ public func resetDefaults() {
     Manager.defaultManager.didDisplayAlertClosure           = nil
     Manager.defaultManager.didOptToRateClosure              = nil
     Manager.defaultManager.didOptToRemindLaterClosure       = nil
-    
-    Manager.defaultManager.customAlertClosure               = nil
 
 #if os(iOS)
     Manager.defaultManager.usesAnimation                    = true
@@ -564,16 +562,12 @@ public func rateApp() {
  */
 
 public typealias ArmchairClosure = () -> ()
-public typealias ArmchairClosureCustomAlert = (_ rateAppClosure: @escaping ArmchairClosure, _ remindLaterClosure: @escaping ArmchairClosure, _ noThanksClosure: @escaping ArmchairClosure) -> ()
 public typealias ArmchairAnimateClosure = (Bool) -> ()
 public typealias ArmchairShouldPromptClosure = (ArmchairTrackingInfo) -> Bool
 public typealias ArmchairShouldIncrementClosure = () -> Bool
 
 public func onDidDisplayAlert(_ didDisplayAlertClosure: ArmchairClosure?) {
     Manager.defaultManager.didDisplayAlertClosure = didDisplayAlertClosure
-}
-public func customAlertClosure(_ customAlertClosure: ArmchairClosureCustomAlert?) {
-    Manager.defaultManager.customAlertClosure = customAlertClosure
 }
 public func onDidDeclineToRate(_ didDeclineToRateClosure: ArmchairClosure?) {
     Manager.defaultManager.didDeclineToRateClosure = didDeclineToRateClosure
@@ -749,7 +743,7 @@ open class Manager : ArmchairManager {
     
     #if os(iOS)
     fileprivate var ratingAlert: UIAlertView? = nil
-    fileprivate let reviewURLTemplate  = "itms-apps://itunes.apple.com/WebObjects/MZStore.woa/wa/viewContentsUserReviews?type=Purple+Software&onlyLatestVersion=true&pageNumber=0&sortOrdering=1&id=APP_ID&at=AFFILIATE_CODE&ct=AFFILIATE_CAMPAIGN_CODE&action=write-review"
+    fileprivate let reviewURLTemplate  = "itms-apps://itunes.apple.com/WebObjects/MZStore.woa/wa/viewContentsUserReviews?type=Purple+Software&onlyLatestVersion=true&pageNumber=0&sortOrdering=1&id=APP_ID&at=AFFILIATE_CODE&ct=AFFILIATE_CAMPAIGN_CODE"
     #elseif os(OSX)
     private var ratingAlert: NSAlert? = nil
     private let reviewURLTemplate = "macappstore://itunes.apple.com/us/app/idAPP_ID?ls=1&mt=12&at=AFFILIATE_CODE&ct=AFFILIATE_CAMPAIGN_CODE"
@@ -926,8 +920,6 @@ open class Manager : ArmchairManager {
     var didOptToRateClosure: ArmchairClosure?
     var didOptToRemindLaterClosure: ArmchairClosure?
     
-    var customAlertClosure: ArmchairClosureCustomAlert?
-    
     #if os(iOS)
     var willPresentModalViewClosure: ArmchairAnimateClosure?
     var didDismissModalViewClosure: ArmchairAnimateClosure?
@@ -1038,7 +1030,7 @@ open class Manager : ArmchairManager {
             userDefaultsObject?.setInteger(incrementKeyCount, forKey:incrementKey)
             
             debugLog("Incremented \(incrementKeyType): \(incrementKeyCount)")
-
+            
         } else if tracksNewVersions {
             // it's a new version of the app, so restart tracking
             resetAllCounters()
@@ -1192,44 +1184,38 @@ open class Manager : ArmchairManager {
     }
     
     fileprivate func showRatingAlert() {
-        if let customClosure = customAlertClosure {
-            customClosure({[weak self] in self?._rateApp()}, {[weak self] in self?.remindMeLater()}, {[weak self] in self?.dontRate()})
-            if let closure = self.didDisplayAlertClosure {
-                closure()
-            }
-        } else {
-            if #available(iOS 9.0, *) {
-                #if os(iOS)
+        if #available(iOS 9.0, *) {
+            #if os(iOS)
                 if (operatingSystemVersion >= 8 && usesAlertController) || operatingSystemVersion >= 9 {
-                        /* iOS 8 uses new UIAlertController API*/
-                        let alertView : UIAlertController = UIAlertController(title: reviewTitle, message: reviewMessage, preferredStyle: UIAlertControllerStyle.alert)
-                        let prefferedAction = UIAlertAction(title: rateButtonTitle, style:UIAlertActionStyle.default, handler: {
+                    /* iOS 8 uses new UIAlertController API*/
+                    let alertView : UIAlertController = UIAlertController(title: reviewTitle, message: reviewMessage, preferredStyle: UIAlertControllerStyle.alert)
+                    let prefferedAction = UIAlertAction(title: rateButtonTitle, style:UIAlertActionStyle.default, handler: {
+                        (alert: UIAlertAction!) in
+                        self._rateApp()
+                    })
+                    alertView.addAction(prefferedAction)
+                    if (showsRemindButton()) {
+                        alertView.addAction(UIAlertAction(title: remindButtonTitle!, style:UIAlertActionStyle.cancel, handler: {
                             (alert: UIAlertAction!) in
-                            self._rateApp()
-                        })
-                        alertView.addAction(prefferedAction)
-                        if (showsRemindButton()) {
-                            alertView.addAction(UIAlertAction(title: remindButtonTitle!, style:UIAlertActionStyle.cancel, handler: {
-                                (alert: UIAlertAction!) in
-                                self.remindMeLater()
-                            }))
-                        }
-                        alertView.addAction(UIAlertAction(title: cancelButtonTitle, style:UIAlertActionStyle.default, handler: {
-                            (alert: UIAlertAction!) in
-                            self.dontRate()
+                            self.remindMeLater()
                         }))
-                        alertView.preferredAction = prefferedAction
-                        
-                        // get the top most controller (= the StoreKit Controller) and dismiss it
-                        if let presentingController = UIApplication.shared.keyWindow?.rootViewController {
-                            if let topController = topMostViewController(presentingController) {
-                                topController.present(alertView, animated: usesAnimation) {
-                                    print("presentViewController() completed")
-                                }
+                    }
+                    alertView.addAction(UIAlertAction(title: cancelButtonTitle, style:UIAlertActionStyle.default, handler: {
+                        (alert: UIAlertAction!) in
+                        self.dontRate()
+                    }))
+                    alertView.preferredAction = prefferedAction
+                    
+                    // get the top most controller (= the StoreKit Controller) and dismiss it
+                    if let presentingController = UIApplication.shared.keyWindow?.rootViewController {
+                        if let topController = topMostViewController(presentingController) {
+                            topController.present(alertView, animated: usesAnimation) {
+                                print("presentViewController() completed")
                             }
-                            // note that tint color has to be set after the controller is presented in order to take effect (last checked in iOS 9.3)
-                            alertView.view.tintColor = tintColor
                         }
+                        // note that tint color has to be set after the controller is presented in order to take effect (last checked in iOS 9.3)
+                        alertView.view.tintColor = tintColor
+                    }
                     
                 } else {
                     /* Otherwise we use UIAlertView still */
@@ -1250,7 +1236,6 @@ open class Manager : ArmchairManager {
                         closure()
                     }
                 }
-            }
                 
             #elseif os(OSX)
                 
@@ -1279,8 +1264,9 @@ open class Manager : ArmchairManager {
                 }
             #else
             #endif
+        } else {
+            // Fallback on earlier versions
         }
-        
     }
     
     // MARK: -
@@ -1417,7 +1403,8 @@ open class Manager : ArmchairManager {
                 if let url = URL(string: reviewURLString()) {
                     UIApplication.shared.openURL(url)
                 }
-            }  
+            }
+            
             // Check for iOS simulator
             #if (arch(i386) || arch(x86_64)) && os(iOS)
                 debugLog("iTunes App Store is not supported on the iOS simulator.")
@@ -1433,7 +1420,6 @@ open class Manager : ArmchairManager {
                 if !opened {
                     debugLog("Failed to open \(url)")
                 }
-
             }
         #else
         #endif
@@ -1796,7 +1782,6 @@ open class Manager : ArmchairManager {
             NotificationCenter.default.addObserver(self, selector: #selector(Manager.applicationWillEnterForeground(_:)), name: NSNotification.Name.NSApplicationWillBecomeActive, object: nil)
         #else
         #endif
-
     }
     
     // MARK: -
@@ -1821,7 +1806,6 @@ open class Manager : ArmchairManager {
     }
     fileprivate func debugLog(_ log: String, file: StaticString = #file, function: StaticString = #function, line: UInt = #line) {
         logger(self, log, file, function, line)
-
     }
     
 }
